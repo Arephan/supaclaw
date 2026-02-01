@@ -234,3 +234,46 @@ await memory.endSession(session.id);
 - Semantic search finds related memories
 - Automatic summarization and extraction
 - Works across all sessions, forever
+
+---
+
+## Local/Self-Hosted Mode (Added to Roadmap)
+
+**Supabase is open source!** Users should be able to run without a subscription.
+
+### Options to Add:
+
+1. **Local Supabase (Docker)**
+   ```bash
+   npx supabase start  # Runs local Supabase
+   openclaw-memory init --local
+   ```
+
+2. **Direct Postgres**
+   - Skip Supabase entirely
+   - Connect to any Postgres with pgvector
+   ```bash
+   openclaw-memory init --postgres postgres://localhost:5432/memory
+   ```
+
+3. **SQLite Mode (Zero Dependencies)**
+   - For single-agent, local-only use
+   - No server required
+   - Uses better-sqlite3 + sqlite-vss for vectors
+   ```bash
+   openclaw-memory init --sqlite ~/.openclaw/memory.db
+   ```
+
+4. **In-Memory Mode (Testing)**
+   ```bash
+   openclaw-memory init --memory
+   ```
+
+### Implementation Steps:
+- [ ] Abstract database layer (SupabaseAdapter, PostgresAdapter, SQLiteAdapter)
+- [ ] Add `--local` flag to init (spins up local Supabase via Docker)
+- [ ] Add `--postgres` flag for direct Postgres connection
+- [ ] Add `--sqlite` flag for zero-dependency local mode
+- [ ] Add `--memory` flag for testing/ephemeral use
+- [ ] Update README with self-hosted instructions
+- [ ] Add docker-compose.yml for easy local Supabase
