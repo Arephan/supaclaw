@@ -1185,4 +1185,490 @@ program
     }
   });
 
+// ============ TASK DEPENDENCIES ============
+
+program
+  .command('task-deps <taskId>')
+  .description('Show task dependencies')
+  .action(async (taskId) => {
+    const config = loadConfig();
+    if (!config) {
+      console.error('❌ No config found. Run `openclaw-memory init` first.');
+      process.exit(1);
+    }
+
+    try {
+      const { OpenClawMemory } = await import('./index');
+      const memory = new OpenClawMemory({
+        supabaseUrl: config.supabaseUrl,
+        supabaseKey: config.supabaseKey,
+        agentId: config.agentId
+      });
+
+      const dependencies = await memory.getTaskDependencies(taskId);
+      const blocked = await memory.isTaskBlocked(taskId);
+
+      console.log(`\n📋 Task Dependencies for ${taskId}:`);
+      console.log(`Status: ${blocked ? '🚫 BLOCKED' : '✅ Ready'}\n`);
+
+      if (dependencies.length === 0) {
+        console.log('No dependencies');
+      } else {
+        dependencies.forEach(dep => {
+          const statusIcon = dep.status === 'done' ? '✅' : '⏳';
+          console.log(`${statusIcon} [${dep.status.toUpperCase()}] ${dep.title}`);
+        });
+      }
+
+    } catch (err) {
+      console.error('❌ Error:', err);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('task-add-dep <taskId> <dependsOnTaskId>')
+  .description('Add a task dependency')
+  .action(async (taskId, dependsOnTaskId) => {
+    const config = loadConfig();
+    if (!config) {
+      console.error('❌ No config found. Run `openclaw-memory init` first.');
+      process.exit(1);
+    }
+
+    try {
+      const { OpenClawMemory } = await import('./index');
+      const memory = new OpenClawMemory({
+        supabaseUrl: config.supabaseUrl,
+        supabaseKey: config.supabaseKey,
+        agentId: config.agentId
+      });
+
+      await memory.addTaskDependency(taskId, dependsOnTaskId);
+      console.log(`✅ Dependency added: ${taskId} depends on ${dependsOnTaskId}`);
+
+    } catch (err) {
+      console.error('❌ Error:', err);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('task-ready')
+  .description('List tasks ready to start (no blocking dependencies)')
+  .option('-u, --user <userId>', 'Filter by user ID')
+  .action(async (options) => {
+    const config = loadConfig();
+    if (!config) {
+      console.error('❌ No config found. Run `openclaw-memory init` first.');
+      process.exit(1);
+    }
+
+    try {
+      const { OpenClawMemory } = await import('./index');
+      const memory = new OpenClawMemory({
+        supabaseUrl: config.supabaseUrl,
+        supabaseKey: config.supabaseKey,
+        agentId: config.agentId
+      });
+
+      const tasks = await memory.getReadyTasks({ userId: options.user });
+
+      console.log(`\n✅ Ready Tasks (${tasks.length}):\n`);
+      tasks.forEach(task => {
+        console.log(`[P${task.priority}] ${task.title}`);
+        if (task.description) {
+          console.log(`   ${task.description}`);
+        }
+        if (task.due_at) {
+          console.log(`   Due: ${new Date(task.due_at).toLocaleString()}`);
+        }
+        console.log();
+      });
+
+    } catch (err) {
+      console.error('❌ Error:', err);
+      process.exit(1);
+    }
+  });
+
+// ============ TASK TEMPLATES ============
+
+program
+  .command('task-template <name>')
+  .description('Create a task template')
+  .option('-f, --file <path>', 'JSON file with template definition')
+  .action(async (name, options) => {
+    const config = loadConfig();
+    if (!config) {
+      console.error('❌ No config found. Run `openclaw-memory init` first.');
+      process.exit(1);
+    }
+
+    if (!options.file) {
+      console.error('❌ --file required. Provide a JSON file with template definition.');
+      console.log('\nExample JSON:');
+      console.log(JSON.stringify({
+        name: 'Example Template',
+        description: 'Template description',
+        tasks: [
+          { title: 'Task 1', description: 'First task', priority: 5 },
+          { title: 'Task 2', description: 'Depends on Task 1', priority: 3, dependencies: [0] }
+        ]
+      }, null, 2));
+      process.exit(1);
+    }
+
+    try {
+      const fs = await import('fs/promises');
+      const templateData = JSON.parse(await fs.readFile(options.file, 'utf-8'));
+
+      const { OpenClawMemory } = await import('./index');
+      const memory = new OpenClawMemory({
+        supabaseUrl: config.supabaseUrl,
+        supabaseKey: config.supabaseKey,
+        agentId: config.agentId
+      });
+
+      const result = await memory.createTaskTemplate(templateData);
+      console.log(`✅ Template created: ${result.id}`);
+
+    } catch (err) {
+      console.error('❌ Error:', err);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('task-templates')
+  .description('List all task templates')
+  .action(async () => {
+    const config = loadConfig();
+    if (!config) {
+      console.error('❌ No config found. Run `openclaw-memory init` first.');
+      process.exit(1);
+    }
+
+    try {
+      const { OpenClawMemory } = await import('./index');
+      const memory = new OpenClawMemory({
+        supabaseUrl: config.supabaseUrl,
+        supabaseKey: config.supabaseKey,
+        agentId: config.agentId
+      });
+
+      const templates = await memory.getTaskTemplates();
+
+      console.log(`\n📋 Task Templates (${templates.length}):\n`);
+      templates.forEach(t => {
+        console.log(`📝 ${t.name} [ID: ${t.id}]`);
+        if (t.description) {
+          console.log(`   ${t.description}`);
+        }
+        console.log(`   Tasks: ${t.tasks.length}`);
+        console.log();
+      });
+
+    } catch (err) {
+      console.error('❌ Error:', err);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('task-apply-template <templateId>')
+  .description('Apply a task template (create all tasks)')
+  .option('-u, --user <userId>', 'User ID for created tasks')
+  .option('-s, --start <date>', 'Start date (ISO format)')
+  .action(async (templateId, options) => {
+    const config = loadConfig();
+    if (!config) {
+      console.error('❌ No config found. Run `openclaw-memory init` first.');
+      process.exit(1);
+    }
+
+    try {
+      const { OpenClawMemory } = await import('./index');
+      const memory = new OpenClawMemory({
+        supabaseUrl: config.supabaseUrl,
+        supabaseKey: config.supabaseKey,
+        agentId: config.agentId
+      });
+
+      const tasks = await memory.applyTaskTemplate(templateId, {
+        userId: options.user,
+        startDate: options.start
+      });
+
+      console.log(`✅ Created ${tasks.length} tasks from template:`);
+      tasks.forEach(t => {
+        console.log(`  - ${t.title} [${t.id}]`);
+      });
+
+    } catch (err) {
+      console.error('❌ Error:', err);
+      process.exit(1);
+    }
+  });
+
+// ============ TASK REMINDERS ============
+
+program
+  .command('task-reminders')
+  .description('Show tasks needing reminders')
+  .option('-u, --user <userId>', 'Filter by user ID')
+  .option('-h, --hours <hours>', 'Hours ahead to check (default: 24)', '24')
+  .action(async (options) => {
+    const config = loadConfig();
+    if (!config) {
+      console.error('❌ No config found. Run `openclaw-memory init` first.');
+      process.exit(1);
+    }
+
+    try {
+      const { OpenClawMemory } = await import('./index');
+      const memory = new OpenClawMemory({
+        supabaseUrl: config.supabaseUrl,
+        supabaseKey: config.supabaseKey,
+        agentId: config.agentId
+      });
+
+      const tasks = await memory.getTasksNeedingReminders({
+        userId: options.user,
+        hoursAhead: parseInt(options.hours)
+      });
+
+      console.log(`\n⏰ Tasks Needing Reminders (${tasks.length}):\n`);
+      tasks.forEach(task => {
+        console.log(memory.formatTaskReminder(task, task.timeUntilDue));
+        console.log();
+      });
+
+    } catch (err) {
+      console.error('❌ Error:', err);
+      process.exit(1);
+    }
+  });
+
+// ============ LEARNING PATTERNS ============
+
+program
+  .command('learning-patterns')
+  .description('Detect patterns in learnings')
+  .action(async () => {
+    const config = loadConfig();
+    if (!config) {
+      console.error('❌ No config found. Run `openclaw-memory init` first.');
+      process.exit(1);
+    }
+
+    try {
+      const { OpenClawMemory } = await import('./index');
+      const memory = new OpenClawMemory({
+        supabaseUrl: config.supabaseUrl,
+        supabaseKey: config.supabaseKey,
+        agentId: config.agentId
+      });
+
+      const patterns = await memory.detectLearningPatterns();
+
+      console.log('\n📊 Learning Patterns:\n');
+      
+      console.log('Common Categories:');
+      patterns.commonCategories.forEach(c => {
+        console.log(`  - ${c.category}: ${c.count}`);
+      });
+
+      console.log('\nCommon Triggers:');
+      patterns.commonTriggers.slice(0, 5).forEach(t => {
+        console.log(`  - "${t.pattern}": ${t.count} occurrences`);
+      });
+
+      console.log('\nRecent Trends:');
+      patterns.recentTrends.forEach(t => {
+        const icon = t.severity === 'critical' ? '🔴' : t.severity === 'warning' ? '🟡' : '🟢';
+        console.log(`  ${icon} Week ${t.week}: ${t.count} learnings`);
+      });
+
+      console.log('\nTop Applied Lessons:');
+      patterns.topLessons.forEach(l => {
+        console.log(`  - "${l.lesson.substring(0, 60)}..." (${l.applied} times)`);
+      });
+
+    } catch (err) {
+      console.error('❌ Error:', err);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('learning-recommend <context>')
+  .description('Get learning recommendations for current context')
+  .option('-l, --limit <number>', 'Max recommendations', '5')
+  .action(async (context, options) => {
+    const config = loadConfig();
+    if (!config) {
+      console.error('❌ No config found. Run `openclaw-memory init` first.');
+      process.exit(1);
+    }
+
+    try {
+      const { OpenClawMemory } = await import('./index');
+      const memory = new OpenClawMemory({
+        supabaseUrl: config.supabaseUrl,
+        supabaseKey: config.supabaseKey,
+        agentId: config.agentId
+      });
+
+      const recommendations = await memory.getLearningRecommendations(
+        context,
+        parseInt(options.limit)
+      );
+
+      console.log(`\n💡 Learning Recommendations for "${context}":\n`);
+      recommendations.forEach(l => {
+        console.log(`[${l.severity.toUpperCase()}] ${l.category}`);
+        console.log(`Trigger: ${l.trigger}`);
+        console.log(`Lesson: ${l.lesson}`);
+        if (l.action) {
+          console.log(`Action: ${l.action}`);
+        }
+        console.log(`Applied: ${l.applied_count} times\n`);
+      });
+
+    } catch (err) {
+      console.error('❌ Error:', err);
+      process.exit(1);
+    }
+  });
+
+// ============ LEARNING SIMILARITY ============
+
+program
+  .command('learning-similar <learningId>')
+  .description('Find similar learnings using embeddings')
+  .option('-k, --openai-key <key>', 'OpenAI API key (or set OPENAI_API_KEY env var)')
+  .option('-l, --limit <number>', 'Max results', '5')
+  .option('-t, --threshold <number>', 'Similarity threshold (0-1)', '0.7')
+  .action(async (learningId, options) => {
+    const config = loadConfig();
+    if (!config) {
+      console.error('❌ No config found. Run `openclaw-memory init` first.');
+      process.exit(1);
+    }
+
+    const apiKey = options.openaiKey || process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      console.error('❌ OpenAI API key required. Provide via --openai-key or OPENAI_API_KEY env var.');
+      process.exit(1);
+    }
+
+    try {
+      const { OpenClawMemory } = await import('./index');
+      const memory = new OpenClawMemory({
+        supabaseUrl: config.supabaseUrl,
+        supabaseKey: config.supabaseKey,
+        agentId: config.agentId,
+        openaiApiKey: apiKey
+      });
+
+      const similar = await memory.findSimilarLearnings(learningId, {
+        limit: parseInt(options.limit),
+        threshold: parseFloat(options.threshold)
+      });
+
+      console.log(`\n🔍 Similar Learnings to ${learningId}:\n`);
+      similar.forEach(l => {
+        console.log(`[Similarity: ${(l.similarity * 100).toFixed(1)}%] ${l.category}`);
+        console.log(`Trigger: ${l.trigger}`);
+        console.log(`Lesson: ${l.lesson}`);
+        console.log(`ID: ${l.id}\n`);
+      });
+
+    } catch (err) {
+      console.error('❌ Error:', err);
+      process.exit(1);
+    }
+  });
+
+// ============ LEARNING EXPORT ============
+
+program
+  .command('learning-export')
+  .description('Export learnings to markdown report')
+  .option('-c, --category <category>', 'Filter by category')
+  .option('-s, --severity <severity>', 'Filter by severity')
+  .option('-d, --since <date>', 'Only include learnings since date (ISO format)')
+  .option('-o, --output <path>', 'Output file path', 'learnings-report.md')
+  .action(async (options) => {
+    const config = loadConfig();
+    if (!config) {
+      console.error('❌ No config found. Run `openclaw-memory init` first.');
+      process.exit(1);
+    }
+
+    try {
+      const { OpenClawMemory } = await import('./index');
+      const memory = new OpenClawMemory({
+        supabaseUrl: config.supabaseUrl,
+        supabaseKey: config.supabaseKey,
+        agentId: config.agentId
+      });
+
+      const report = await memory.exportLearningsReport({
+        category: options.category,
+        severity: options.severity,
+        since: options.since
+      });
+
+      const fs = await import('fs/promises');
+      await fs.writeFile(options.output, report, 'utf-8');
+
+      console.log(`✅ Learning report exported to ${options.output}`);
+
+    } catch (err) {
+      console.error('❌ Error:', err);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('learning-export-json')
+  .description('Export learnings to JSON')
+  .option('-c, --category <category>', 'Filter by category')
+  .option('-s, --severity <severity>', 'Filter by severity')
+  .option('-d, --since <date>', 'Only include learnings since date (ISO format)')
+  .option('-o, --output <path>', 'Output file path', 'learnings-export.json')
+  .action(async (options) => {
+    const config = loadConfig();
+    if (!config) {
+      console.error('❌ No config found. Run `openclaw-memory init` first.');
+      process.exit(1);
+    }
+
+    try {
+      const { OpenClawMemory } = await import('./index');
+      const memory = new OpenClawMemory({
+        supabaseUrl: config.supabaseUrl,
+        supabaseKey: config.supabaseKey,
+        agentId: config.agentId
+      });
+
+      const data = await memory.exportLearningsJSON({
+        category: options.category,
+        severity: options.severity,
+        since: options.since
+      });
+
+      const fs = await import('fs/promises');
+      await fs.writeFile(options.output, JSON.stringify(data, null, 2), 'utf-8');
+
+      console.log(`✅ Learning data exported to ${options.output}`);
+
+    } catch (err) {
+      console.error('❌ Error:', err);
+      process.exit(1);
+    }
+  });
+
 program.parse(process.argv);

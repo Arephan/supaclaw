@@ -49,10 +49,14 @@
 ## Phase 6: Tasks & Learnings (10-min session) ✅ COMPLETE
 37. ✅ Complete task CRUD
 38. ✅ Task hierarchy (subtasks)
-39. ✅ Task reminders integration
-40. ✅ Learnings retrieval for context
-41. ✅ Learning application tracking
-42. [ ] Learning similarity search
+39. ✅ Task dependencies
+40. ✅ Task reminders integration
+41. ✅ Task templates
+42. ✅ Learnings retrieval for context
+43. ✅ Learning pattern detection
+44. ✅ Learning application tracking
+45. ✅ Learning similarity search
+46. ✅ Learning export/report
 
 ## Phase 5: Context Window Management (10-min session) ✅ COMPLETE
 41. ✅ Token estimation utilities
