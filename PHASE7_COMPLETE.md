@@ -198,7 +198,7 @@ openclaw-memory entities --type person
 openclaw-memory entity-graph abc-123 --depth 2
 
 # Extract from conversation
-openclaw-memory extract-entities "Han works at MetalBear in San Francisco"
+openclaw-memory extract-entities "Alice works at TechCorp in San Francisco"
 
 # View network stats
 openclaw-memory entity-stats
@@ -250,20 +250,20 @@ npm test -- entity-relationships
 
 ```typescript
 const text = `
-  Han works at MetalBear as a Full Stack Engineer.
-  MetalBear is located in San Francisco.
-  Han knows Sarah, who also works at MetalBear.
+  Alice works at TechCorp as a Full Stack Engineer.
+  TechCorp is located in San Francisco.
+  Alice knows Sarah, who also works at TechCorp.
 `;
 
 const { entities, relationships } = await memory.extractEntitiesWithRelationships(text);
 
 // Creates:
-// - Entities: Han, MetalBear, San Francisco, Sarah
+// - Entities: Han, TechCorp, San Francisco, Sarah
 // - Relationships:
-//   - Han → works_at → MetalBear
-//   - MetalBear → located_in → San Francisco
+//   - Han → works_at → TechCorp
+//   - TechCorp → located_in → San Francisco
 //   - Han → knows → Sarah
-//   - Sarah → works_at → MetalBear
+//   - Sarah → works_at → TechCorp
 ```
 
 ### 2. Entity Discovery
@@ -273,7 +273,7 @@ const { entities, relationships } = await memory.extractEntitiesWithRelationship
 const related = await memory.findRelatedEntities(hanId, { maxDepth: 2 });
 
 // Returns:
-// 1. MetalBear (works_at) - 1 hop, confidence 0.9
+// 1. TechCorp (works_at) - 1 hop, confidence 0.9
 // 2. San Francisco (works_at → located_in) - 2 hops, confidence 0.72
 // 3. Sarah (knows) - 1 hop, confidence 0.8
 ```
@@ -329,7 +329,7 @@ WHERE NOT e.id = ANY(SELECT unnest(eg.relationship_path::UUID[]))
 ### Directional Relationships
 
 All relationships are directed (source → target):
-- `Han → works_at → MetalBear` ≠ `MetalBear → works_at → Han`
+- `Han → works_at → TechCorp` ≠ `TechCorp → works_at → Han`
 - Query both directions with `direction: 'both'`
 
 ## Performance

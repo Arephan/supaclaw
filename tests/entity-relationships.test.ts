@@ -66,7 +66,7 @@ describe('Entity Relationships', () => {
           },
           relatedEntity: {
             id: 'entity-2',
-            name: 'MetalBear',
+            name: 'TechCorp',
             entity_type: 'organization'
           },
           direction: 'outgoing' as const
@@ -87,7 +87,7 @@ describe('Entity Relationships', () => {
           },
           relatedEntity: {
             id: 'entity-1',
-            name: 'Han',
+            name: 'Alice',
             entity_type: 'person'
           },
           direction: 'incoming' as const
@@ -130,7 +130,7 @@ describe('Entity Relationships', () => {
       const mockDepth1 = [
         {
           entityId: 'entity-2',
-          entityName: 'MetalBear',
+          entityName: 'TechCorp',
           entityType: 'organization',
           relationshipPath: ['works_at'],
           totalConfidence: 0.9,
@@ -191,7 +191,7 @@ describe('Entity Relationships', () => {
         avgConnectionsPerEntity: 2.5,
         mostConnectedEntity: {
           id: 'entity-1',
-          name: 'Han',
+          name: 'Alice',
           connectionCount: 8
         }
       };
@@ -216,17 +216,17 @@ describe('Entity Relationships', () => {
 
   describe('extractEntitiesWithRelationships', () => {
     it('should extract entities and relationships from text', async () => {
-      const text = 'Han works at MetalBear, a company located in San Francisco.';
+      const text = 'Alice works at TechCorp, a company located in San Francisco.';
 
       const mockResult = {
         entities: [
-          { type: 'person', name: 'Han', description: 'Person' },
-          { type: 'organization', name: 'MetalBear', description: 'Company' },
+          { type: 'person', name: 'Alice', description: 'Person' },
+          { type: 'organization', name: 'TechCorp', description: 'Company' },
           { type: 'place', name: 'San Francisco', description: 'City' }
         ],
         relationships: [
-          { source: 'Han', target: 'MetalBear', type: 'works_at', confidence: 0.9 },
-          { source: 'MetalBear', target: 'San Francisco', type: 'located_in', confidence: 0.8 }
+          { source: 'Alice', target: 'TechCorp', type: 'works_at', confidence: 0.9 },
+          { source: 'TechCorp', target: 'San Francisco', type: 'located_in', confidence: 0.8 }
         ]
       };
 
@@ -252,7 +252,7 @@ describe('Entity Relationships', () => {
 
       const mockResult = {
         entities: [
-          { type: 'person', name: 'Han' },
+          { type: 'person', name: 'Alice' },
           { type: 'person', name: 'Sarah' }
         ],
         relationships: []
@@ -348,23 +348,23 @@ describe('Entity Relationships', () => {
   describe('Integration scenarios', () => {
     it('should build entity graph from conversation', async () => {
       const conversation = `
-        Han works at MetalBear as a Full Stack Engineer.
-        MetalBear is located in San Francisco.
-        Han knows Sarah, who also works at MetalBear.
+        Alice works at TechCorp as a Full Stack Engineer.
+        TechCorp is located in San Francisco.
+        Alice knows Sarah, who also works at TechCorp.
       `;
 
       const mockExtracted = {
         entities: [
-          { name: 'Han', type: 'person' },
-          { name: 'MetalBear', type: 'organization' },
+          { name: 'Alice', type: 'person' },
+          { name: 'TechCorp', type: 'organization' },
           { name: 'San Francisco', type: 'place' },
           { name: 'Sarah', type: 'person' }
         ],
         relationships: [
-          { source: 'Han', target: 'MetalBear', type: 'works_at' },
-          { source: 'MetalBear', target: 'San Francisco', type: 'located_in' },
-          { source: 'Han', target: 'Sarah', type: 'knows' },
-          { source: 'Sarah', target: 'MetalBear', type: 'works_at' }
+          { source: 'Alice', target: 'TechCorp', type: 'works_at' },
+          { source: 'TechCorp', target: 'San Francisco', type: 'located_in' },
+          { source: 'Alice', target: 'Sarah', type: 'knows' },
+          { source: 'Sarah', target: 'TechCorp', type: 'works_at' }
         ]
       };
 
@@ -373,11 +373,11 @@ describe('Entity Relationships', () => {
     });
 
     it('should find mutual connections', async () => {
-      // Han knows Sarah, Sarah knows Tom, Han knows Tom
+      // Alice knows Sarah, Sarah knows Tom, Alice knows Tom
       const mockRelationships = [
-        { source: 'Han', target: 'Sarah', type: 'knows' },
+        { source: 'Alice', target: 'Sarah', type: 'knows' },
         { source: 'Sarah', target: 'Tom', type: 'knows' },
-        { source: 'Han', target: 'Tom', type: 'knows' }
+        { source: 'Alice', target: 'Tom', type: 'knows' }
       ];
 
       const hanKnows = mockRelationships
@@ -389,7 +389,7 @@ describe('Entity Relationships', () => {
     });
 
     it('should detect transitive relationships', async () => {
-      // If Han works_at MetalBear, and MetalBear located_in SF
+      // If Alice works_at TechCorp, and TechCorp located_in SF
       // Then Han is indirectly related to SF
       const mockGraph = [
         {

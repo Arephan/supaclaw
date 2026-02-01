@@ -98,10 +98,10 @@ const entities = await memory.extractEntities('I love using Claude for coding');
 
 // Extract entities AND relationships in one call
 const { entities, relationships } = await memory.extractEntitiesWithRelationships(
-  'Han works at MetalBear in San Francisco'
+  'Alice works at TechCorp in San Francisco'
 );
-// Returns entities: Han (person), MetalBear (organization), San Francisco (place)
-// Returns relationships: Han → works_at → MetalBear, MetalBear → located_in → San Francisco
+// Returns entities: Han (person), TechCorp (organization), San Francisco (place)
+// Returns relationships: Han → works_at → TechCorp, TechCorp → located_in → San Francisco
 
 // Find related entities through graph traversal (multi-hop)
 const related = await memory.findRelatedEntities(hanId, { maxDepth: 2 });
