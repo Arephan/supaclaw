@@ -1,11 +1,11 @@
 {
-  "name": "openclaw-memory",
+  "name": "supaclaw",
   "version": "1.0.0",
   "description": "Persistent memory for AI agents using Supabase - sessions, memories, semantic search",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "openclaw-memory": "./dist/cli.js"
+    "supaclaw": "dist/cli.js"
   },
   "files": [
     "dist/**/*",
@@ -43,12 +43,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Arephan/openclaw-memory"
+    "url": "git+https://github.com/Arephan/supaclaw.git"
   },
   "bugs": {
-    "url": "https://github.com/Arephan/openclaw-memory/issues"
+    "url": "https://github.com/Arephan/supaclaw/issues"
   },
-  "homepage": "https://github.com/Arephan/openclaw-memory#readme",
+  "homepage": "https://github.com/Arephan/supaclaw#readme",
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",
     "commander": "^14.0.3",

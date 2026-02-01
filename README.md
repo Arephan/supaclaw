@@ -1,10 +1,10 @@
-# 🧠 OpenClaw Memory
+# 🧠 Supaclaw
 
 **Persistent memory for AI agents using Supabase.**
 
 Stop losing context. Stop re-reading massive markdown files. Give your agent a real memory.
 
-[![npm version](https://badge.fury.io/js/openclaw-memory.svg)](https://www.npmjs.com/package/openclaw-memory)
+[![npm version](https://badge.fury.io/js/supaclaw.svg)](https://www.npmjs.com/package/supaclaw)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## The Problem
@@ -17,7 +17,7 @@ AI agents using file-based memory (MEMORY.md, daily logs) face:
 
 ## The Solution
 
-OpenClaw Memory uses **Supabase (Postgres)** to give your agent:
+Supaclaw uses **Supabase (Postgres)** to give your agent:
 - ✅ **Session tracking** - Every conversation logged with metadata
 - ✅ **Semantic search** - Find relevant memories via vector similarity (pgvector)
 - ✅ **Smart context** - Only load what's relevant, not everything
@@ -29,11 +29,11 @@ OpenClaw Memory uses **Supabase (Postgres)** to give your agent:
 ## Quick Start
 
 ```bash
-npm install openclaw-memory
+npm install supaclaw
 ```
 
 ```typescript
-import { OpenClawMemory } from 'openclaw-memory';
+import { OpenClawMemory } from 'supaclaw';
 
 const memory = new OpenClawMemory({
   supabaseUrl: process.env.SUPABASE_URL,
@@ -171,7 +171,7 @@ See [SCHEMA.md](./SCHEMA.md) for full details.
 
 ## Search Modes
 
-OpenClaw Memory supports three search strategies:
+Supaclaw supports three search strategies:
 
 ### 📝 Keyword Search (Default)
 Traditional text matching - fast, no API keys needed.
@@ -241,7 +241,7 @@ console.log('Stats:', result.stats);
 ### Custom Budget Allocation
 
 ```typescript
-import { createContextBudget } from 'openclaw-memory';
+import { createContextBudget } from 'supaclaw';
 
 const budget = createContextBudget({
   modelContextSize: 200000,     // 200k tokens for Claude
@@ -262,7 +262,7 @@ const result = await memory.buildOptimizedContext({
 Automatically adjusts allocation based on available content:
 
 ```typescript
-import { createAdaptiveBudget } from 'openclaw-memory';
+import { createAdaptiveBudget } from 'supaclaw';
 
 const budget = createAdaptiveBudget({
   messageCount: 100,   // Lots of messages
@@ -290,63 +290,63 @@ See [CONTEXT_WINDOW_GUIDE.md](./CONTEXT_WINDOW_GUIDE.md) for detailed examples a
 
 ```bash
 # Initialize config
-npx openclaw-memory init
+npx supaclaw init
 
 # Run migrations
-npx openclaw-memory migrate
+npx supaclaw migrate
 
 # Test connection
-npx openclaw-memory test
+npx supaclaw test
 
 # Check database status
-npx openclaw-memory status
+npx supaclaw status
 
 # Search memories (keyword mode)
-npx openclaw-memory search "TypeScript"
+npx supaclaw search "TypeScript"
 
 # Semantic search (requires OPENAI_API_KEY)
-npx openclaw-memory search "coding best practices" --mode semantic
+npx supaclaw search "coding best practices" --mode semantic
 
 # Hybrid search
-npx openclaw-memory search "AI patterns" --mode hybrid --limit 15
+npx supaclaw search "AI patterns" --mode hybrid --limit 15
 
 # List sessions
-npx openclaw-memory sessions --limit 20 --active
+npx supaclaw sessions --limit 20 --active
 
 # Export memories
-npx openclaw-memory export memories.md
+npx supaclaw export memories.md
 
 # Import memories
-npx openclaw-memory import MEMORY.md
+npx supaclaw import MEMORY.md
 
 # Import from Clawdbot workspace
-npx openclaw-memory import-memory-md ~/clawd/MEMORY.md
-npx openclaw-memory import-daily-logs ~/clawd/memory
-npx openclaw-memory import-todo-md ~/clawd/TODO.md
-npx openclaw-memory import-learnings-md ~/clawd/LEARNINGS.md
+npx supaclaw import-memory-md ~/clawd/MEMORY.md
+npx supaclaw import-daily-logs ~/clawd/memory
+npx supaclaw import-todo-md ~/clawd/TODO.md
+npx supaclaw import-learnings-md ~/clawd/LEARNINGS.md
 
 # Import everything at once
-npx openclaw-memory import-all ~/clawd --user-id han
+npx supaclaw import-all ~/clawd --user-id han
 ```
 
 ## 🤖 Clawdbot Integration
 
-OpenClaw Memory provides seamless integration with [Clawdbot](https://github.com/clawdbot/clawdbot) to replace file-based memory systems.
+Supaclaw provides seamless integration with [Clawdbot](https://github.com/clawdbot/clawdbot) to replace file-based memory systems.
 
 ### Installation as Clawdbot Skill
 
 ```bash
 # Install via clawdhub
-clawdhub install openclaw-memory
+clawdhub install supaclaw
 
 # Or install globally via npm
-npm install -g openclaw-memory
+npm install -g supaclaw
 ```
 
 ### Quick Setup
 
 ```typescript
-import { createClawdbotIntegration } from 'openclaw-memory';
+import { createClawdbotIntegration } from 'supaclaw';
 
 const integration = createClawdbotIntegration({
   supabaseUrl: process.env.SUPABASE_URL!,
@@ -472,7 +472,7 @@ for (const task of upcomingTasks) {
 - Tokens per turn: ~12,500
 - Cost per 1M turns: ~$37.50
 
-**After (OpenClaw Memory):**
+**After (Supaclaw):**
 - Memories retrieved: 5
 - Tokens per turn: ~500
 - Cost per 1M turns: ~$1.50
@@ -489,7 +489,7 @@ See [`skill/example-integration.ts`](skill/example-integration.ts) for a full wo
 
 ### Migrating from Clawdbot Memory Files
 
-If you're using traditional Clawdbot memory files, OpenClaw Memory can import them:
+If you're using traditional Clawdbot memory files, Supaclaw can import them:
 
 **Supported formats:**
 - `MEMORY.md` → memories table (with importance and category tags)
@@ -501,19 +501,19 @@ If you're using traditional Clawdbot memory files, OpenClaw Memory can import th
 
 ```bash
 # Import MEMORY.md
-npx openclaw-memory import-memory-md ~/clawd/MEMORY.md
+npx supaclaw import-memory-md ~/clawd/MEMORY.md
 
 # Import daily logs from memory/
-npx openclaw-memory import-daily-logs ~/clawd/memory --user-id han
+npx supaclaw import-daily-logs ~/clawd/memory --user-id han
 
 # Import TODO.md
-npx openclaw-memory import-todo-md ~/clawd/TODO.md
+npx supaclaw import-todo-md ~/clawd/TODO.md
 
 # Import LEARNINGS.md
-npx openclaw-memory import-learnings-md ~/clawd/LEARNINGS.md
+npx supaclaw import-learnings-md ~/clawd/LEARNINGS.md
 
 # Import everything at once
-npx openclaw-memory import-all ~/clawd --user-id han
+npx supaclaw import-all ~/clawd --user-id han
 ```
 
 **What gets imported:**
@@ -538,7 +538,7 @@ npx openclaw-memory import-all ~/clawd --user-id han
    ```
 3. Run the migrations:
    ```bash
-   npx openclaw-memory migrate
+   npx supaclaw migrate
    ```
 4. Set environment variables:
    ```bash
