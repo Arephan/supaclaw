@@ -22,6 +22,7 @@ OpenClaw Memory uses **Supabase (Postgres)** to give your agent:
 - ✅ **Semantic search** - Find relevant memories via vector similarity (pgvector)
 - ✅ **Smart context** - Only load what's relevant, not everything
 - ✅ **Context window management** - Token budgeting, smart selection, lost-in-middle mitigation
+- ✅ **Entity relationships** - Knowledge graph with multi-hop traversal, confidence scoring
 - ✅ **Multi-agent** - Share memories across agents
 - ✅ **Structured data** - SQL queries, relationships, types
 
@@ -95,6 +96,17 @@ const { session, messages, context } = await memory.resumeSession(sessionId);
 const entities = await memory.extractEntities('I love using Claude for coding');
 // Returns: [{ entity_type: 'product', name: 'Claude', description: '...' }]
 
+// Extract entities AND relationships in one call
+const { entities, relationships } = await memory.extractEntitiesWithRelationships(
+  'Han works at MetalBear in San Francisco'
+);
+// Returns entities: Han (person), MetalBear (organization), San Francisco (place)
+// Returns relationships: Han → works_at → MetalBear, MetalBear → located_in → San Francisco
+
+// Find related entities through graph traversal (multi-hop)
+const related = await memory.findRelatedEntities(hanId, { maxDepth: 2 });
+// Returns entities connected within 2 hops with relationship paths and confidence scores
+
 // Create tasks with hierarchy
 const project = await memory.createTask({ title: 'Build feature X' });
 await memory.createTask({ 
@@ -137,6 +149,12 @@ memories (id, agent_id, user_id, category, content, importance, embedding, expir
 ### Entities
 ```sql
 entities (id, agent_id, entity_type, name, aliases, properties, embedding, ...)
+```
+
+### Entity Relationships
+```sql
+entity_relationships (id, agent_id, source_entity_id, target_entity_id, relationship_type, 
+                      confidence, mention_count, properties, ...)
 ```
 
 ### Tasks
@@ -477,6 +495,57 @@ Search entities with filters.
 
 ### `memory.mergeEntities(primaryId, duplicateId)`
 Merge duplicate entities (deduplication).
+
+### `memory.createEntityRelationship(rel)`
+Create or update a relationship between entities.
+
+**Parameters:**
+- `sourceEntityId` - Source entity UUID
+- `targetEntityId` - Target entity UUID
+- `relationshipType` - Type: `works_at`, `knows`, `created`, `located_in`, etc.
+- `properties` - Optional additional context
+- `confidence` - Confidence score 0-1 (default: 0.5)
+- `sessionId` - Optional source session
+
+**Returns:** EntityRelationship
+
+### `memory.getEntityRelationships(entityId, opts?)`
+Get relationships for an entity.
+
+**Options:**
+- `direction` - `'outgoing'` | `'incoming'` | `'both'` (default: `'both'`)
+- `relationshipType` - Filter by type
+- `minConfidence` - Minimum confidence threshold (default: 0.3)
+- `limit` - Maximum results (default: 50)
+
+**Returns:** Array of `{ relationship, relatedEntity, direction }`
+
+### `memory.findRelatedEntities(entityId, opts?)`
+Find entities connected through multi-hop relationships (graph traversal).
+
+**Options:**
+- `maxDepth` - Maximum hops (default: 2)
+- `minConfidence` - Minimum confidence threshold (default: 0.5)
+
+**Returns:** Array of `{ entityId, entityName, entityType, relationshipPath, totalConfidence, depth }`
+
+### `memory.getEntityNetworkStats()`
+Get entity network statistics.
+
+**Returns:** `{ totalEntities, totalRelationships, avgConnectionsPerEntity, mostConnectedEntity }`
+
+### `memory.extractEntitiesWithRelationships(text, opts?)`
+Extract entities AND relationships from text using AI (one call).
+
+**Returns:** `{ entities: Entity[], relationships: EntityRelationship[] }`
+
+### `memory.searchRelationships(opts?)`
+Search relationships with filters.
+
+**Options:** `relationshipType`, `minConfidence`, `limit`
+
+### `memory.deleteEntityRelationship(relationshipId)`
+Delete a relationship.
 
 ### `memory.decayMemoryImportance(opts?)`
 Apply importance decay to old memories (lifecycle management).

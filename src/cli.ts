@@ -965,4 +965,224 @@ program
   .description('Show cleanup statistics')
   .action(cmdCleanupStats);
 
+program
+  .command('entities')
+  .description('List entities')
+  .option('-t, --type <type>', 'Filter by entity type')
+  .option('-l, --limit <number>', 'Maximum results', '50')
+  .action(async (options) => {
+    const config = loadConfig();
+    if (!config) {
+      console.error('❌ No config found. Run `openclaw-memory init` first.');
+      process.exit(1);
+    }
+
+    try {
+      const { OpenClawMemory } = await import('./index');
+      const memory = new OpenClawMemory({
+        supabaseUrl: config.supabaseUrl,
+        supabaseKey: config.supabaseKey,
+        agentId: config.agentId
+      });
+
+      const entities = await memory.searchEntities({
+        entityType: options.type,
+        limit: parseInt(options.limit)
+      });
+
+      if (entities.length === 0) {
+        console.log('No entities found.');
+        return;
+      }
+
+      console.log(`\n📦 Found ${entities.length} entities:\n`);
+      entities.forEach((entity, i) => {
+        console.log(`${i + 1}. ${entity.name} [${entity.entity_type}]`);
+        console.log(`   ID: ${entity.id}`);
+        if (entity.description) {
+          console.log(`   Description: ${entity.description}`);
+        }
+        if (entity.aliases && entity.aliases.length > 0) {
+          console.log(`   Aliases: ${entity.aliases.join(', ')}`);
+        }
+        console.log(`   Mentions: ${entity.mention_count}`);
+        console.log(`   Last seen: ${new Date(entity.last_seen_at).toLocaleString()}`);
+        console.log();
+      });
+    } catch (err) {
+      console.error('❌ Error:', err);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('entity-graph <entityId>')
+  .description('Show entity relationship graph')
+  .option('-d, --depth <number>', 'Maximum depth', '2')
+  .option('-c, --min-confidence <number>', 'Minimum confidence', '0.5')
+  .action(async (entityId, options) => {
+    const config = loadConfig();
+    if (!config) {
+      console.error('❌ No config found. Run `openclaw-memory init` first.');
+      process.exit(1);
+    }
+
+    try {
+      const { OpenClawMemory } = await import('./index');
+      const memory = new OpenClawMemory({
+        supabaseUrl: config.supabaseUrl,
+        supabaseKey: config.supabaseKey,
+        agentId: config.agentId
+      });
+
+      // Get direct relationships
+      const relationships = await memory.getEntityRelationships(entityId);
+
+      console.log(`\n🕸️  Entity Relationship Graph\n`);
+
+      if (relationships.length === 0) {
+        console.log('No relationships found.');
+        return;
+      }
+
+      // Group by direction
+      const outgoing = relationships.filter(r => r.direction === 'outgoing');
+      const incoming = relationships.filter(r => r.direction === 'incoming');
+
+      if (outgoing.length > 0) {
+        console.log('Outgoing relationships:');
+        outgoing.forEach(r => {
+          console.log(`  → ${r.relatedEntity.name} [${r.relationship.relationship_type}]`);
+          console.log(`     Confidence: ${r.relationship.confidence.toFixed(2)}, Mentions: ${r.relationship.mention_count}`);
+        });
+        console.log();
+      }
+
+      if (incoming.length > 0) {
+        console.log('Incoming relationships:');
+        incoming.forEach(r => {
+          console.log(`  ← ${r.relatedEntity.name} [${r.relationship.relationship_type}]`);
+          console.log(`     Confidence: ${r.relationship.confidence.toFixed(2)}, Mentions: ${r.relationship.mention_count}`);
+        });
+        console.log();
+      }
+
+      // Get related entities (graph traversal)
+      const related = await memory.findRelatedEntities(entityId, {
+        maxDepth: parseInt(options.depth),
+        minConfidence: parseFloat(options.minConfidence)
+      });
+
+      if (related.length > 0) {
+        console.log(`Related entities (within ${options.depth} hops):`);
+        related.forEach(r => {
+          const path = r.relationshipPath.join(' → ');
+          console.log(`  ${r.entityName} [${r.entityType}]`);
+          console.log(`     Path: ${path}`);
+          console.log(`     Confidence: ${r.totalConfidence.toFixed(3)}, Depth: ${r.depth}`);
+        });
+      }
+
+    } catch (err) {
+      console.error('❌ Error:', err);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('entity-stats')
+  .description('Show entity network statistics')
+  .action(async () => {
+    const config = loadConfig();
+    if (!config) {
+      console.error('❌ No config found. Run `openclaw-memory init` first.');
+      process.exit(1);
+    }
+
+    try {
+      const { OpenClawMemory } = await import('./index');
+      const memory = new OpenClawMemory({
+        supabaseUrl: config.supabaseUrl,
+        supabaseKey: config.supabaseKey,
+        agentId: config.agentId
+      });
+
+      const stats = await memory.getEntityNetworkStats();
+
+      console.log('\n📊 Entity Network Statistics\n');
+      console.log(`Total Entities: ${stats.totalEntities}`);
+      console.log(`Total Relationships: ${stats.totalRelationships}`);
+      console.log(`Avg Connections per Entity: ${stats.avgConnectionsPerEntity.toFixed(2)}`);
+      
+      if (stats.mostConnectedEntity) {
+        console.log(`\nMost Connected Entity:`);
+        console.log(`  Name: ${stats.mostConnectedEntity.name}`);
+        console.log(`  Connections: ${stats.mostConnectedEntity.connectionCount}`);
+      }
+    } catch (err) {
+      console.error('❌ Error:', err);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('extract-entities <text>')
+  .description('Extract entities and relationships from text')
+  .option('-k, --openai-key <key>', 'OpenAI API key (or set OPENAI_API_KEY env var)')
+  .action(async (text, options) => {
+    const config = loadConfig();
+    if (!config) {
+      console.error('❌ No config found. Run `openclaw-memory init` first.');
+      process.exit(1);
+    }
+
+    const apiKey = options.openaiKey || process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      console.error('❌ OpenAI API key required. Provide via --openai-key or OPENAI_API_KEY env var.');
+      process.exit(1);
+    }
+
+    try {
+      const { OpenClawMemory } = await import('./index');
+      const memory = new OpenClawMemory({
+        supabaseUrl: config.supabaseUrl,
+        supabaseKey: config.supabaseKey,
+        agentId: config.agentId,
+        openaiApiKey: apiKey
+      });
+
+      console.log('🧠 Extracting entities and relationships...\n');
+      const result = await memory.extractEntitiesWithRelationships(text);
+
+      console.log(`✅ Extracted:`);
+      console.log(`   Entities: ${result.entities.length}`);
+      console.log(`   Relationships: ${result.relationships.length}\n`);
+
+      if (result.entities.length > 0) {
+        console.log('Entities:');
+        result.entities.forEach(e => {
+          console.log(`  - ${e.name} [${e.entity_type}]`);
+          if (e.description) {
+            console.log(`    ${e.description}`);
+          }
+        });
+        console.log();
+      }
+
+      if (result.relationships.length > 0) {
+        console.log('Relationships:');
+        result.relationships.forEach(r => {
+          const source = result.entities.find(e => e.id === r.source_entity_id)?.name;
+          const target = result.entities.find(e => e.id === r.target_entity_id)?.name;
+          console.log(`  - ${source} → ${r.relationship_type} → ${target}`);
+          console.log(`    Confidence: ${r.confidence.toFixed(2)}`);
+        });
+      }
+
+    } catch (err) {
+      console.error('❌ Error:', err);
+      process.exit(1);
+    }
+  });
+
 program.parse(process.argv);
