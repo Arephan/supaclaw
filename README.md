@@ -318,6 +318,57 @@ npx openclaw-memory export memories.md
 
 # Import memories
 npx openclaw-memory import MEMORY.md
+
+# Import from Clawdbot workspace
+npx openclaw-memory import-memory-md ~/clawd/MEMORY.md
+npx openclaw-memory import-daily-logs ~/clawd/memory
+npx openclaw-memory import-todo-md ~/clawd/TODO.md
+npx openclaw-memory import-learnings-md ~/clawd/LEARNINGS.md
+
+# Import everything at once
+npx openclaw-memory import-all ~/clawd --user-id han
+```
+
+### Migrating from Clawdbot Memory Files
+
+If you're using traditional Clawdbot memory files, OpenClaw Memory can import them:
+
+**Supported formats:**
+- `MEMORY.md` → memories table (with importance and category tags)
+- `memory/*.md` → sessions + messages (daily logs)
+- `TODO.md` → tasks table (with status and due dates)
+- `LEARNINGS.md` → learnings table (with triggers and lessons)
+
+**Import examples:**
+
+```bash
+# Import MEMORY.md
+npx openclaw-memory import-memory-md ~/clawd/MEMORY.md
+
+# Import daily logs from memory/
+npx openclaw-memory import-daily-logs ~/clawd/memory --user-id han
+
+# Import TODO.md
+npx openclaw-memory import-todo-md ~/clawd/TODO.md
+
+# Import LEARNINGS.md
+npx openclaw-memory import-learnings-md ~/clawd/LEARNINGS.md
+
+# Import everything at once
+npx openclaw-memory import-all ~/clawd --user-id han
+```
+
+**What gets imported:**
+- MEMORY.md: Parses sections (##) as categories, list items and paragraphs as memories
+- Daily logs: Extracts sessions and User/Assistant message exchanges
+- TODO.md: Imports tasks with status (pending/completed/cancelled), priority, and due dates
+- LEARNINGS.md: Imports learnings with category, trigger, lesson, and importance
+
+**Tag support:**
+- `[importance: 0.9]` - Set memory importance (0.0-1.0)
+- `[2024-01-28]` - Set creation date
+- `[due: 2024-02-15]` - Set task due date
+
 ```
 
 ## Setup Supabase

@@ -123,14 +123,14 @@
 79. [ ] Learning similarity search
 80. [ ] Learning export/report
 
-### Phase 9: Migration & Import (Steps 81-88)
-81. [ ] Parse MEMORY.md → memories table
-82. [ ] Parse memory/*.md → sessions + messages
-83. [ ] Parse TODO.md → tasks table
-84. [ ] Parse LEARNINGS.md → learnings table
+### Phase 9: Migration & Import ✅ (Steps 81-88) - DONE
+81. ✅ Parse MEMORY.md → memories table
+82. ✅ Parse memory/*.md → sessions + messages
+83. ✅ Parse TODO.md → tasks table
+84. ✅ Parse LEARNINGS.md → learnings table
 85. [ ] Import from Mem0 format
 86. [ ] Import from LangChain memory
-87. [ ] Export to markdown (full backup)
+87. ✅ Export to markdown (full backup)
 88. [ ] Sync bidirectional (DB ↔ markdown)
 
 ### Phase 10: Clawdbot Integration (Steps 89-95)

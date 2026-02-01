@@ -1671,4 +1671,396 @@ program
     }
   });
 
+// ============ PHASE 9: MIGRATION & IMPORT ============
+
+program
+  .command('import-memory-md <path>')
+  .description('Import MEMORY.md into memories table')
+  .action(async (memoryPath: string) => {
+    const config = loadConfig();
+    if (!config) {
+      console.error('❌ No config found. Run `openclaw-memory init` first.');
+      process.exit(1);
+    }
+
+    try {
+      console.log(`📥 Importing MEMORY.md from: ${memoryPath}\n`);
+
+      const { parseMemoryMd } = await import('./parsers');
+      const { OpenClawMemory } = await import('./index');
+
+      const memories = parseMemoryMd(memoryPath);
+      console.log(`Found ${memories.length} memories to import\n`);
+
+      const memory = new OpenClawMemory({
+        supabaseUrl: config.supabaseUrl,
+        supabaseKey: config.supabaseKey,
+        agentId: config.agentId
+      });
+
+      let imported = 0;
+      for (const mem of memories) {
+        try {
+          await memory.remember({
+            content: mem.content,
+            category: mem.category,
+            importance: mem.importance,
+            metadata: mem.metadata
+          });
+          imported++;
+        } catch (err) {
+          console.error(`⚠️  Failed to import: ${mem.content.substring(0, 50)}...`, err);
+        }
+      }
+
+      console.log(`\n✅ Imported ${imported}/${memories.length} memories`);
+
+    } catch (err) {
+      console.error('❌ Import error:', err);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('import-daily-logs <directory>')
+  .description('Import memory/*.md daily logs into sessions table')
+  .option('-u, --user-id <id>', 'User ID for sessions', 'default')
+  .action(async (directory: string, options: { userId: string }) => {
+    const config = loadConfig();
+    if (!config) {
+      console.error('❌ No config found. Run `openclaw-memory init` first.');
+      process.exit(1);
+    }
+
+    try {
+      console.log(`📥 Importing daily logs from: ${directory}\n`);
+
+      const { parseAllDailyLogs } = await import('./parsers');
+      const { OpenClawMemory } = await import('./index');
+
+      const sessions = parseAllDailyLogs(directory, options.userId);
+      console.log(`Found ${sessions.length} sessions to import\n`);
+
+      const memory = new OpenClawMemory({
+        supabaseUrl: config.supabaseUrl,
+        supabaseKey: config.supabaseKey,
+        agentId: config.agentId
+      });
+
+      let imported = 0;
+      for (const sess of sessions) {
+        try {
+          const session = await memory.startSession({
+            userId: sess.user_id,
+            channel: sess.channel
+          });
+
+          for (const msg of sess.messages) {
+            await memory.addMessage(session.id, {
+              role: msg.role,
+              content: msg.content
+            });
+          }
+
+          if (sess.ended_at || sess.summary) {
+            await memory.endSession(session.id, { summary: sess.summary });
+          }
+
+          imported++;
+        } catch (err) {
+          console.error(`⚠️  Failed to import session:`, err);
+        }
+      }
+
+      console.log(`\n✅ Imported ${imported}/${sessions.length} sessions`);
+
+    } catch (err) {
+      console.error('❌ Import error:', err);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('import-todo-md <path>')
+  .description('Import TODO.md into tasks table')
+  .action(async (todoPath: string) => {
+    const config = loadConfig();
+    if (!config) {
+      console.error('❌ No config found. Run `openclaw-memory init` first.');
+      process.exit(1);
+    }
+
+    try {
+      console.log(`📥 Importing TODO.md from: ${todoPath}\n`);
+
+      const { parseTodoMd } = await import('./parsers');
+      const { OpenClawMemory } = await import('./index');
+
+      const tasks = parseTodoMd(todoPath);
+      console.log(`Found ${tasks.length} tasks to import\n`);
+
+      const memory = new OpenClawMemory({
+        supabaseUrl: config.supabaseUrl,
+        supabaseKey: config.supabaseKey,
+        agentId: config.agentId
+      });
+
+      let imported = 0;
+      for (const task of tasks) {
+        try {
+          await memory.createTask({
+            title: task.title,
+            description: task.description,
+            priority: task.priority,
+            dueAt: task.due_date,
+            metadata: { ...task.metadata, originalStatus: task.status }
+          });
+          imported++;
+        } catch (err) {
+          console.error(`⚠️  Failed to import task: ${task.title}`, err);
+        }
+      }
+
+      console.log(`\n✅ Imported ${imported}/${tasks.length} tasks`);
+
+    } catch (err) {
+      console.error('❌ Import error:', err);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('import-learnings-md <path>')
+  .description('Import LEARNINGS.md into learnings table')
+  .action(async (learningsPath: string) => {
+    const config = loadConfig();
+    if (!config) {
+      console.error('❌ No config found. Run `openclaw-memory init` first.');
+      process.exit(1);
+    }
+
+    try {
+      console.log(`📥 Importing LEARNINGS.md from: ${learningsPath}\n`);
+
+      const { parseLearningsMd } = await import('./parsers');
+      const { OpenClawMemory } = await import('./index');
+
+      const learnings = parseLearningsMd(learningsPath);
+      console.log(`Found ${learnings.length} learnings to import\n`);
+
+      const memory = new OpenClawMemory({
+        supabaseUrl: config.supabaseUrl,
+        supabaseKey: config.supabaseKey,
+        agentId: config.agentId
+      });
+
+      let imported = 0;
+      for (const learning of learnings) {
+        try {
+          // Map parsed category to valid enum value
+          const validCategories = ['error', 'correction', 'improvement', 'capability_gap'];
+          const category = validCategories.includes(learning.category) 
+            ? learning.category as 'error' | 'correction' | 'improvement' | 'capability_gap'
+            : 'improvement';
+
+          await memory.learn({
+            category,
+            trigger: learning.trigger,
+            lesson: learning.lesson,
+            metadata: { 
+              originalCategory: learning.category,
+              originalImportance: learning.importance 
+            }
+          });
+          imported++;
+        } catch (err) {
+          console.error(`⚠️  Failed to import learning:`, err);
+        }
+      }
+
+      console.log(`\n✅ Imported ${imported}/${learnings.length} learnings`);
+
+    } catch (err) {
+      console.error('❌ Import error:', err);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('import-all <workspace>')
+  .description('Import all Clawdbot memory files from workspace (MEMORY.md, memory/, TODO.md, LEARNINGS.md)')
+  .option('-u, --user-id <id>', 'User ID for sessions', 'default')
+  .action(async (workspace: string, options: { userId: string }) => {
+    const config = loadConfig();
+    if (!config) {
+      console.error('❌ No config found. Run `openclaw-memory init` first.');
+      process.exit(1);
+    }
+
+    const { join } = await import('path');
+    const { existsSync } = await import('fs');
+
+    console.log(`📦 Importing all memory files from: ${workspace}\n`);
+
+    const memoryMdPath = join(workspace, 'MEMORY.md');
+    const dailyLogsDir = join(workspace, 'memory');
+    const todoMdPath = join(workspace, 'TODO.md');
+    const learningsMdPath = join(workspace, 'LEARNINGS.md');
+
+    let totalImported = 0;
+
+    // Import MEMORY.md
+    if (existsSync(memoryMdPath)) {
+      try {
+        console.log('📄 Importing MEMORY.md...');
+        const { parseMemoryMd } = await import('./parsers');
+        const { OpenClawMemory } = await import('./index');
+
+        const memories = parseMemoryMd(memoryMdPath);
+        const memory = new OpenClawMemory({
+          supabaseUrl: config.supabaseUrl,
+          supabaseKey: config.supabaseKey,
+          agentId: config.agentId
+        });
+
+        for (const mem of memories) {
+          try {
+            await memory.remember({
+              content: mem.content,
+              category: mem.category,
+              importance: mem.importance,
+              metadata: mem.metadata
+            });
+            totalImported++;
+          } catch (err) {
+            // Silent skip
+          }
+        }
+        console.log(`✅ Imported ${memories.length} memories\n`);
+      } catch (err) {
+        console.error('⚠️  Failed to import MEMORY.md:', err);
+      }
+    }
+
+    // Import daily logs
+    if (existsSync(dailyLogsDir)) {
+      try {
+        console.log('📅 Importing daily logs...');
+        const { parseAllDailyLogs } = await import('./parsers');
+        const { OpenClawMemory } = await import('./index');
+
+        const sessions = parseAllDailyLogs(dailyLogsDir, options.userId);
+        const memory = new OpenClawMemory({
+          supabaseUrl: config.supabaseUrl,
+          supabaseKey: config.supabaseKey,
+          agentId: config.agentId
+        });
+
+        for (const sess of sessions) {
+          try {
+            const session = await memory.startSession({
+              userId: sess.user_id,
+              channel: sess.channel
+            });
+
+            for (const msg of sess.messages) {
+              await memory.addMessage(session.id, {
+                role: msg.role,
+                content: msg.content
+              });
+            }
+
+            if (sess.ended_at || sess.summary) {
+              await memory.endSession(session.id, { summary: sess.summary });
+            }
+            totalImported++;
+          } catch (err) {
+            // Silent skip
+          }
+        }
+        console.log(`✅ Imported ${sessions.length} sessions\n`);
+      } catch (err) {
+        console.error('⚠️  Failed to import daily logs:', err);
+      }
+    }
+
+    // Import TODO.md
+    if (existsSync(todoMdPath)) {
+      try {
+        console.log('✅ Importing TODO.md...');
+        const { parseTodoMd } = await import('./parsers');
+        const { OpenClawMemory } = await import('./index');
+
+        const tasks = parseTodoMd(todoMdPath);
+        const memory = new OpenClawMemory({
+          supabaseUrl: config.supabaseUrl,
+          supabaseKey: config.supabaseKey,
+          agentId: config.agentId
+        });
+
+        for (const task of tasks) {
+          try {
+            await memory.createTask({
+              title: task.title,
+              description: task.description,
+              priority: task.priority,
+              dueAt: task.due_date,
+              metadata: { ...task.metadata, originalStatus: task.status }
+            });
+            totalImported++;
+          } catch (err) {
+            // Silent skip
+          }
+        }
+        console.log(`✅ Imported ${tasks.length} tasks\n`);
+      } catch (err) {
+        console.error('⚠️  Failed to import TODO.md:', err);
+      }
+    }
+
+    // Import LEARNINGS.md
+    if (existsSync(learningsMdPath)) {
+      try {
+        console.log('🧠 Importing LEARNINGS.md...');
+        const { parseLearningsMd } = await import('./parsers');
+        const { OpenClawMemory } = await import('./index');
+
+        const learnings = parseLearningsMd(learningsMdPath);
+        const memory = new OpenClawMemory({
+          supabaseUrl: config.supabaseUrl,
+          supabaseKey: config.supabaseKey,
+          agentId: config.agentId
+        });
+
+        for (const learning of learnings) {
+          try {
+            // Map parsed category to valid enum value
+            const validCategories = ['error', 'correction', 'improvement', 'capability_gap'];
+            const category = validCategories.includes(learning.category) 
+              ? learning.category as 'error' | 'correction' | 'improvement' | 'capability_gap'
+              : 'improvement';
+
+            await memory.learn({
+              category,
+              trigger: learning.trigger,
+              lesson: learning.lesson,
+              metadata: { 
+                originalCategory: learning.category,
+                originalImportance: learning.importance 
+              }
+            });
+            totalImported++;
+          } catch (err) {
+            // Silent skip
+          }
+        }
+        console.log(`✅ Imported ${learnings.length} learnings\n`);
+      } catch (err) {
+        console.error('⚠️  Failed to import LEARNINGS.md:', err);
+      }
+    }
+
+    console.log(`\n🎉 Migration complete! Total items imported: ${totalImported}`);
+  });
+
 program.parse(process.argv);
