@@ -1,4 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import OpenAI from 'openai';
 
 export interface OpenClawMemoryConfig {
   supabaseUrl: string;
@@ -6,6 +7,7 @@ export interface OpenClawMemoryConfig {
   agentId: string;
   embeddingProvider?: 'openai' | 'voyage' | 'none';
   openaiApiKey?: string;
+  embeddingModel?: string; // Default: text-embedding-3-small
 }
 
 export interface Session {
@@ -91,11 +93,47 @@ export class OpenClawMemory {
   private supabase: SupabaseClient;
   private agentId: string;
   private config: OpenClawMemoryConfig;
+  private openai?: OpenAI;
 
   constructor(config: OpenClawMemoryConfig) {
     this.supabase = createClient(config.supabaseUrl, config.supabaseKey);
     this.agentId = config.agentId;
     this.config = config;
+    
+    // Initialize OpenAI if API key provided
+    if (config.openaiApiKey) {
+      this.openai = new OpenAI({ apiKey: config.openaiApiKey });
+    }
+  }
+
+  /**
+   * Generate embedding for text using configured provider
+   */
+  private async generateEmbedding(text: string): Promise<number[] | null> {
+    if (!this.config.embeddingProvider || this.config.embeddingProvider === 'none') {
+      return null;
+    }
+
+    if (this.config.embeddingProvider === 'openai') {
+      if (!this.openai) {
+        throw new Error('OpenAI API key not provided');
+      }
+
+      const model = this.config.embeddingModel || 'text-embedding-3-small';
+      const response = await this.openai.embeddings.create({
+        model,
+        input: text,
+      });
+
+      return response.data[0].embedding;
+    }
+
+    // TODO: Add Voyage AI support
+    if (this.config.embeddingProvider === 'voyage') {
+      throw new Error('Voyage AI embeddings not yet implemented');
+    }
+
+    return null;
   }
 
   /**
@@ -246,7 +284,7 @@ export class OpenClawMemory {
   // ============ MEMORIES ============
 
   /**
-   * Store a long-term memory
+   * Store a long-term memory with semantic embedding
    */
   async remember(memory: {
     content: string;
@@ -257,8 +295,8 @@ export class OpenClawMemory {
     expiresAt?: string;
     metadata?: Record<string, unknown>;
   }): Promise<Memory> {
-    // TODO: Generate embedding if provider configured
-    const embedding = null;
+    // Generate embedding if provider configured
+    const embedding = await this.generateEmbedding(memory.content);
 
     const { data, error } = await this.supabase
       .from('memories')
@@ -281,16 +319,35 @@ export class OpenClawMemory {
   }
 
   /**
-   * Search memories semantically
+   * Search memories using vector similarity (semantic search)
    */
   async recall(query: string, opts: {
     userId?: string;
     category?: string;
     limit?: number;
     minImportance?: number;
+    minSimilarity?: number; // Cosine similarity threshold (0-1)
   } = {}): Promise<Memory[]> {
-    // TODO: Use vector search when embeddings are available
-    // For now, fall back to text search
+    // Generate query embedding for semantic search
+    const queryEmbedding = await this.generateEmbedding(query);
+
+    if (queryEmbedding) {
+      // Use pgvector for semantic search
+      const { data, error } = await this.supabase.rpc('match_memories', {
+        query_embedding: queryEmbedding,
+        match_threshold: opts.minSimilarity ?? 0.7,
+        match_count: opts.limit || 10,
+        p_agent_id: this.agentId,
+        p_user_id: opts.userId,
+        p_category: opts.category,
+        p_min_importance: opts.minImportance
+      });
+
+      if (error) throw error;
+      return data || [];
+    }
+
+    // Fallback to text search when no embeddings available
     let q = this.supabase
       .from('memories')
       .select()
@@ -315,6 +372,46 @@ export class OpenClawMemory {
     const { data, error } = await q;
     if (error) throw error;
     return data || [];
+  }
+
+  /**
+   * Hybrid search: combines semantic similarity and keyword matching
+   * Returns deduplicated results sorted by relevance score
+   */
+  async hybridRecall(query: string, opts: {
+    userId?: string;
+    category?: string;
+    limit?: number;
+    minImportance?: number;
+    vectorWeight?: number; // Weight for semantic similarity (0-1), default 0.7
+    keywordWeight?: number; // Weight for keyword match (0-1), default 0.3
+  } = {}): Promise<Memory[]> {
+    const vectorWeight = opts.vectorWeight ?? 0.7;
+    const keywordWeight = opts.keywordWeight ?? 0.3;
+
+    // Generate query embedding
+    const queryEmbedding = await this.generateEmbedding(query);
+
+    if (queryEmbedding) {
+      // Use hybrid search RPC function
+      const { data, error } = await this.supabase.rpc('hybrid_search_memories', {
+        query_embedding: queryEmbedding,
+        query_text: query,
+        vector_weight: vectorWeight,
+        keyword_weight: keywordWeight,
+        match_count: opts.limit || 10,
+        p_agent_id: this.agentId,
+        p_user_id: opts.userId,
+        p_category: opts.category,
+        p_min_importance: opts.minImportance
+      });
+
+      if (error) throw error;
+      return data || [];
+    }
+
+    // Fallback to regular recall if no embeddings
+    return this.recall(query, opts);
   }
 
   /**
@@ -353,6 +450,24 @@ export class OpenClawMemory {
     }
 
     const { data, error } = await query;
+    if (error) throw error;
+    return data || [];
+  }
+
+  /**
+   * Find memories similar to an existing memory
+   * Useful for context expansion and deduplication
+   */
+  async findSimilarMemories(memoryId: string, opts: {
+    minSimilarity?: number;
+    limit?: number;
+  } = {}): Promise<Memory[]> {
+    const { data, error } = await this.supabase.rpc('find_similar_memories', {
+      memory_id: memoryId,
+      match_threshold: opts.minSimilarity ?? 0.8,
+      match_count: opts.limit || 5
+    });
+
     if (error) throw error;
     return data || [];
   }

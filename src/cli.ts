@@ -270,7 +270,11 @@ async function cmdStatus(): Promise<void> {
   }
 }
 
-async function cmdSearch(query: string, options: { limit?: number }): Promise<void> {
+async function cmdSearch(query: string, options: { 
+  limit?: number;
+  mode?: 'keyword' | 'semantic' | 'hybrid';
+  minSimilarity?: number;
+}): Promise<void> {
   const config = loadConfig();
   if (!config) {
     console.error('❌ No config found. Run `openclaw-memory init` first.');
@@ -283,23 +287,88 @@ async function cmdSearch(query: string, options: { limit?: number }): Promise<vo
   }
 
   const limit = options.limit || 10;
-  console.log(`🔍 Searching memories for: "${query}"\n`);
+  const mode = options.mode || 'keyword';
+  const modeEmoji = {
+    keyword: '📝',
+    semantic: '🧠',
+    hybrid: '⚡'
+  };
+
+  console.log(`${modeEmoji[mode]} Searching memories (${mode} mode): "${query}"\n`);
 
   const supabase = getSupabaseClient(config);
 
   try {
-    // For now, use keyword search (semantic search requires embeddings)
-    const { data, error } = await supabase
-      .from('memories')
-      .select('*')
-      .eq('agent_id', config.agentId)
-      .or(`content.ilike.%${query}%,category.ilike.%${query}%`)
-      .order('importance', { ascending: false })
-      .limit(limit);
+    let data: any[] = [];
 
-    if (error) {
-      console.error('❌ Search failed:', error.message);
-      process.exit(1);
+    if (mode === 'keyword') {
+      // Traditional keyword search
+      const { data: results, error } = await supabase
+        .from('memories')
+        .select('*')
+        .eq('agent_id', config.agentId)
+        .or(`content.ilike.%${query}%,category.ilike.%${query}%`)
+        .order('importance', { ascending: false })
+        .limit(limit);
+
+      if (error) throw error;
+      data = results || [];
+    } else if (mode === 'semantic') {
+      // Vector similarity search (requires OpenAI API key)
+      const openaiKey = process.env.OPENAI_API_KEY;
+      if (!openaiKey) {
+        console.error('❌ OPENAI_API_KEY environment variable required for semantic search');
+        process.exit(1);
+      }
+
+      const OpenAI = (await import('openai')).default;
+      const openai = new OpenAI({ apiKey: openaiKey });
+      
+      const embeddingResponse = await openai.embeddings.create({
+        model: 'text-embedding-3-small',
+        input: query,
+      });
+      
+      const queryEmbedding = embeddingResponse.data[0].embedding;
+
+      const { data: results, error } = await supabase.rpc('match_memories', {
+        query_embedding: queryEmbedding,
+        match_threshold: options.minSimilarity || 0.7,
+        match_count: limit,
+        p_agent_id: config.agentId
+      });
+
+      if (error) throw error;
+      data = results || [];
+    } else if (mode === 'hybrid') {
+      // Hybrid search: vector + keyword
+      const openaiKey = process.env.OPENAI_API_KEY;
+      if (!openaiKey) {
+        console.error('❌ OPENAI_API_KEY environment variable required for hybrid search');
+        process.exit(1);
+      }
+
+      const OpenAI = (await import('openai')).default;
+      const openai = new OpenAI({ apiKey: openaiKey });
+      
+      const embeddingResponse = await openai.embeddings.create({
+        model: 'text-embedding-3-small',
+        input: query,
+      });
+      
+      const queryEmbedding = embeddingResponse.data[0].embedding;
+
+      const { data: results, error } = await supabase.rpc('hybrid_search_memories', {
+        query_embedding: queryEmbedding,
+        query_text: query,
+        vector_weight: 0.7,
+        keyword_weight: 0.3,
+        match_count: limit,
+        p_agent_id: config.agentId
+      });
+
+      if (error) throw error;
+      data = results || [];
     }
 
     if (!data || data.length === 0) {
@@ -308,10 +377,14 @@ async function cmdSearch(query: string, options: { limit?: number }): Promise<vo
     }
 
     console.log(`Found ${data.length} memories:\n`);
-    data.forEach((mem, idx) => {
-      console.log(`${idx + 1}. [${mem.category}] (importance: ${mem.importance})`);
+    data.forEach((mem: any, idx: number) => {
+      const scoreLabel = mem.similarity ? `similarity: ${mem.similarity.toFixed(3)}` :
+                        mem.score ? `score: ${mem.score.toFixed(3)}` :
+                        `importance: ${mem.importance}`;
+      
+      console.log(`${idx + 1}. [${mem.category || 'none'}] (${scoreLabel})`);
       console.log(`   ${mem.content}`);
-      if (mem.metadata) {
+      if (mem.metadata && Object.keys(mem.metadata).length > 0) {
         console.log(`   Metadata: ${JSON.stringify(mem.metadata)}`);
       }
       console.log(`   Created: ${new Date(mem.created_at).toLocaleString()}\n`);
@@ -568,10 +641,17 @@ program
 
 program
   .command('search <query>')
-  .description('Search memories by keyword')
+  .description('Search memories using keyword, semantic, or hybrid search')
   .option('-l, --limit <number>', 'Maximum results', '10')
+  .option('-m, --mode <type>', 'Search mode: keyword, semantic, or hybrid', 'keyword')
+  .option('-s, --min-similarity <number>', 'Minimum similarity score (0-1) for semantic/hybrid search', '0.7')
   .action((query, options) => {
-    cmdSearch(query, { limit: parseInt(options.limit) });
+    const mode = ['keyword', 'semantic', 'hybrid'].includes(options.mode) ? options.mode : 'keyword';
+    cmdSearch(query, { 
+      limit: parseInt(options.limit),
+      mode: mode as 'keyword' | 'semantic' | 'hybrid',
+      minSimilarity: parseFloat(options.minSimilarity)
+    });
   });
 
 program
